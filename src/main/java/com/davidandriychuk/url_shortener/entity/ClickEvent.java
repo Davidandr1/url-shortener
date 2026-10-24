@@ -7,7 +7,7 @@ import jakarta.persistence.Id;
 
 @Entity
 public class ClickEvent{
-//test
+
     @Id
     @GeneratedValue(strategy=GenerationType.AUTO)
     private long id;
