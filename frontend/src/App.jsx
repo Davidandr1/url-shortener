@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API = 'http://localhost:8080';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('shorten');
@@ -219,8 +219,8 @@ export default function App() {
                       <p>
                         <b>Success!</b> Short code:{' '}
                         <span className="font-mono bg-green-100 px-1 py-0.5 rounded">
-                    {shortenResult.shortCode}
-                  </span>
+                          {shortenResult.shortCode}
+                        </span>
                       </p>
                       <p>
                         Redirect link:{' '}
@@ -317,22 +317,24 @@ export default function App() {
                         >
                           <p className="text-sm text-black">
                             <b>Long:</b>{' '}
-                            <a href={`${link.originalUrl}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline hover:text-black"
-                            >
-                              {link.originalUrl || link.url}</a>
-                          </p>
-                          <p className="text-sm text-black">
-                            <b>Short:</b>{' '}
                             <a
-                                href={`http://localhost:8080/s/${link.shortCode}`}
+                                href={link.originalUrl}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="underline hover:text-black"
                             >
-                              http://localhost:8080/s/{link.shortCode}
+                              {link.originalUrl || link.url}
+                            </a>
+                          </p>
+                          <p className="text-sm text-black">
+                            <b>Short:</b>{' '}
+                            <a
+                                href={`${API}/s/${link.shortCode}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline hover:text-black"
+                            >
+                              {API}/s/{link.shortCode}
                             </a>
                           </p>
                         </div>
