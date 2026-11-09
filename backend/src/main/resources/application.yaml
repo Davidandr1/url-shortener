@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: url-shortener
+
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/postgres
+    username: postgres
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 1h
+
+  data:
+    redis:
+      host: redis
+      port: 6379
+
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        default-requeue-rejected: false
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration-ms: 3600000
+ip-hash:
+  secret: ${IP_HASH_SECRET}
