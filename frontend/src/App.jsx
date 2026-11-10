@@ -104,7 +104,9 @@ export default function App() {
         alert('Session expired or unauthorized. Please log in again.');
         setToken('');
         setActiveTab('auth');
-      } else {
+      } else if (response.status === 429){
+        alert('Too many requests. Please try again in a couple seconds.');
+      }else {
         alert('Failed to shorten URL.');
       }
     } catch (err) {

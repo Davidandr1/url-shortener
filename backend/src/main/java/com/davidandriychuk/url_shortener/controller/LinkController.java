@@ -1,42 +1,36 @@
 package com.davidandriychuk.url_shortener.controller;
 
-import com.davidandriychuk.url_shortener.dto.AuthResponseDTO;
-import com.davidandriychuk.url_shortener.dto.JwtResponse;
-import com.davidandriychuk.url_shortener.dto.LoginRequest;
-import com.davidandriychuk.url_shortener.security.JWTGenerator;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;import com.davidandriychuk.url_shortener.entity.Link;
+import org.springframework.web.bind.annotation.RestController;
+import com.davidandriychuk.url_shortener.entity.Link;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import com.davidandriychuk.url_shortener.entity.User;
 import com.davidandriychuk.url_shortener.repository.UserRepository;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
 import com.davidandriychuk.url_shortener.repository.LinkRepository;
 import com.davidandriychuk.url_shortener.service.LinkService;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.AmqpException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
-import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 import com.davidandriychuk.url_shortener.dto.ClickEventMessage;
 import com.davidandriychuk.url_shortener.config.RabbitConfig;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Refill;
+import java.time.Duration;
+import java.util.concurrent.ConcurrentHashMap;
 
-import static com.davidandriychuk.url_shortener.entity.Link.decodeShortCode;
 import static com.davidandriychuk.url_shortener.entity.Link.generateShortCode;
 
 @RestController
@@ -46,7 +40,13 @@ class LinkController{
     private final UserRepository userRepository;
     private final LinkService linkService;
     private final RabbitTemplate rabbitTemplate;
+    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    private Bucket bucketFor(String email) {
+        return buckets.computeIfAbsent(email, k -> Bucket.builder()
+                .addLimit(Bandwidth.classic(20, Refill.greedy(20, Duration.ofMinutes(1))))
+                .build());
+    }
 
     LinkController(LinkRepository repository, UserRepository userRepository, LinkService linkService, RabbitTemplate rabbitTemplate){
         this.repository = repository;
@@ -67,25 +67,29 @@ class LinkController{
     }
 
     @PostMapping("/links")
-    Link newLink(@RequestBody Map<String, String> request) {
-        String originalUrl = request.get("url");
+    ResponseEntity<?> newLink(@RequestBody Map<String, String> request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String email = authentication.getName();
 
-        Authentication authenication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authenication.getName();
+        if (!bucketFor(email).tryConsume(1)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .body(Map.of("error", "Rate limit exceeded. Try again later."));
+        }
+
+        String originalUrl = request.get("url");
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NoSuchElementException("User not found: " + email));
 
         LocalDateTime created = LocalDateTime.now();
         LocalDateTime expires = created.plusHours(72);
-        Link link = new Link(originalUrl, user.getId(),created, expires);
+        Link link = new Link(originalUrl, user.getId(), created, expires);
         link = repository.save(link);
 
-        String shortCode = generateShortCode(link.getId());
-        link.setShortCode(shortCode);
+        link.setShortCode(generateShortCode(link.getId()));
         link = repository.save(link);
 
-        return link;
+        return ResponseEntity.ok(link);
     }
 
     @GetMapping("/s/{shortCode}")
