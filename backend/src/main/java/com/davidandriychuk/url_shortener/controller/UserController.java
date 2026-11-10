@@ -5,10 +5,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import com.davidandriychuk.url_shortener.repository.UserRepository;
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/user")
 class UserController{
 
     private final UserRepository userRepository;

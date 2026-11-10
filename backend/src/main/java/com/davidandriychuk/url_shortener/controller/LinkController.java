@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import com.davidandriychuk.url_shortener.entity.Link;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import com.davidandriychuk.url_shortener.entity.User;
@@ -44,7 +43,7 @@ class LinkController{
 
     private Bucket bucketFor(String email) {
         return buckets.computeIfAbsent(email, k -> Bucket.builder()
-                .addLimit(Bandwidth.classic(20, Refill.greedy(20, Duration.ofMinutes(1))))
+                .addLimit(Bandwidth.classic(5, Refill.greedy(5, Duration.ofMinutes(1))))
                 .build());
     }
 
@@ -55,18 +54,24 @@ class LinkController{
         this.rabbitTemplate = rabbitTemplate;
     }
 
-    @GetMapping("/links")
-    List<Link> all() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authentication.getName();
+    @GetMapping("/api/links")
+    ResponseEntity<?> all() {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String email = authentication.getName();
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NoSuchElementException("User not found: " + email));
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new NoSuchElementException("User not found: " + email));
 
-        return repository.findByUserId(user.getId());
+            return ResponseEntity.ok(repository.findByUserId(user.getId()));
+        } catch (Exception e) {
+            System.err.println("CRITICAL ERROR IN GET /api/links: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
-    @PostMapping("/links")
+    @PostMapping("/api/links")
     ResponseEntity<?> newLink(@RequestBody Map<String, String> request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String email = authentication.getName();
